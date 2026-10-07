@@ -54,6 +54,7 @@ text-analyzer-python/
 ├── screenshots/
 │   └── main-window.png
 ├── requirements.txt
+├── .gitignore
 └── README.md
 ```
 
