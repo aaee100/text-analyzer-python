@@ -1,3 +1,4 @@
+
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from collections import Counter
@@ -17,34 +18,54 @@ DATA_DIR.mkdir(exist_ok=True)
 # Default words to exclude
 # -------------------------
 STOP_WORDS = {
-    "the", "and", "a", "an", "to", "of", "in", "on", "for", "at", "by", "from",
-    "is", "it", "this", "that", "with", "as", "be", "are", "was", "were",
-    "or", "not", "but", "if", "then", "so", "than", "too", "can", "will",
-    "just", "also", "about", "into", "out", "up", "down", "over", "under",
+    "the", "and", "a", "an", "to", "of", "in", "on", "for", "at", "by",
+    "from", "is", "it", "this", "that", "with", "as", "be", "are",
+    "was", "were", "or", "not", "but", "if", "then", "so", "than",
+    "too", "can", "will", "just", "also", "about", "into", "out",
+    "up", "down", "over", "under",
 }
+
+
+# -------------------------
+# Read text file
+# -------------------------
+def read_text_file(filepath):
+    """Read a text file using supported Unicode encodings."""
+
+    encodings = ("utf-8-sig", "utf-16")
+
+    for encoding in encodings:
+        try:
+            with open(
+                filepath,
+                "r",
+                encoding=encoding
+            ) as file:
+                return file.read()
+
+        except UnicodeDecodeError:
+            continue
+
+    raise ValueError(
+        "The file could not be decoded as UTF-8 or UTF-16.\n\n"
+        "Please save the text file using UTF-8 encoding "
+        "and try again."
+    )
 
 
 # -------------------------
 # Analyze text file
 # -------------------------
 def analyze_file(filepath):
-    """Read a text file and return basic statistics and top words."""
+    """Read a text file and return statistics and top words."""
 
-    text = None
+    try:
+        text = read_text_file(filepath)
 
-    # Try several common encodings
-    for encoding in ("utf-8", "utf-16", "latin-1"):
-        try:
-            with open(filepath, "r", encoding=encoding) as file:
-                text = file.read()
-            break
-        except (UnicodeDecodeError, OSError):
-            continue
-
-    if text is None:
+    except (OSError, ValueError) as error:
         messagebox.showerror(
-            "Error",
-            "Could not read the selected text file."
+            "File Error",
+            str(error)
         )
         return None
 
@@ -60,22 +81,29 @@ def analyze_file(filepath):
     # Combine default and user-defined excluded words
     all_excluded = STOP_WORDS.union(user_exclude)
 
-    # Find words and remove excluded words
-    words = [
+    # Find all words before exclusions
+    all_words = re.findall(
+        r"\b\w+\b",
+        text.lower()
+    )
+
+    # Remove excluded words
+    filtered_words = [
         word
-        for word in re.findall(r"\b\w+\b", text.lower())
+        for word in all_words
         if word not in all_excluded
     ]
 
     lines = len(text.splitlines())
     characters = len(text)
 
-    # Get 10 most common words
-    common_words = Counter(words).most_common(10)
+    # Get 10 most common words after exclusions
+    common_words = Counter(filtered_words).most_common(10)
 
     return {
         "lines": lines,
-        "words": len(words),
+        "words_total": len(all_words),
+        "words_filtered": len(filtered_words),
         "characters": characters,
         "common": common_words
     }
@@ -89,7 +117,7 @@ def analyze_and_display(filepath):
 
     result = analyze_file(filepath)
 
-    if not result:
+    if result is None:
         return
 
     last_file["path"] = filepath
@@ -100,13 +128,14 @@ def analyze_and_display(filepath):
     )
 
     lbl_lines_val.config(text=result["lines"])
-    lbl_words_val.config(text=result["words"])
+    lbl_words_total_val.config(text=result["words_total"])
+    lbl_words_filtered_val.config(text=result["words_filtered"])
     lbl_chars_val.config(text=result["characters"])
 
     # Clear previous results
     lst_top.delete(0, tk.END)
 
-    # Display top words
+    # Display top words after exclusions
     for word, count in result["common"]:
         lst_top.insert(tk.END, f"{word} - {count}")
 
@@ -173,7 +202,7 @@ def on_word_click(event):
 # -------------------------
 root = tk.Tk()
 root.title("Text Analyzer")
-root.geometry("700x700")
+root.geometry("700x740")
 root.resizable(False, False)
 
 frm_main = ttk.Frame(root, padding=15)
@@ -237,7 +266,10 @@ def add_stat_row(name):
 
 
 lbl_lines_val = add_stat_row("Lines")
-lbl_words_val = add_stat_row("Words")
+lbl_words_total_val = add_stat_row("Words (all)")
+lbl_words_filtered_val = add_stat_row(
+    "Words (after exclusions)"
+)
 lbl_chars_val = add_stat_row("Characters")
 
 
@@ -261,7 +293,7 @@ entry_exclude.pack(fill="x", padx=5)
 # -------------------------
 ttk.Label(
     frm_main,
-    text="Top 10 Words:",
+    text="Top 10 Words (after exclusions):",
     font=("Segoe UI", 10, "bold")
 ).pack(pady=(10, 0))
 
